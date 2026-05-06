@@ -2,34 +2,40 @@
 ## llama.cpp throughout. No Docker. Cross-platform via 00-setup/*.
 
 VENV     := .venv
-PY       := $(VENV)/bin/python
-PIP      := $(VENV)/bin/pip
-LOCUST   := $(VENV)/bin/locust
+PY       := $(VENV)/Scripts/python.exe
+PIP      := $(VENV)/Scripts/pip.exe
+LOCUST   := $(VENV)/Scripts/locust.exe
 
-# Detect OS for setup target. macOS, Linux, anything-else (Windows users use the .ps1 directly).
-OS := $(shell uname -s 2>/dev/null || echo Unknown)
+# Detect OS for setup target. macOS, Linux, Windows_NT, or Unknown.
+ifeq ($(OS),Windows_NT)
+    DET_OS := Windows_NT
+else
+    DET_OS := $(shell uname -s 2>/dev/null || echo Unknown)
+endif
 
 .DEFAULT_GOAL := help
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} \
 	      /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
-	@printf "\nWindows users: run 00-setup/windows-setup.ps1 then call individual scripts directly.\n\n"
+	@printf "\nWindows users: run 00-setup/windows-setup.ps1 (via powershell) then call individual scripts directly.\n\n"
 
 # ─────────────────────────────────────────────────────────────
 # Setup
 # ─────────────────────────────────────────────────────────────
 
 probe: ## Probe hardware — writes hardware.json (no install)
-	@python3 00-setup/detect-hardware.py
+	@python 00-setup/detect-hardware.py
 
 setup: ## Install deps + build llama-cpp-python + download models (auto-detects OS)
-ifeq ($(OS),Darwin)
+ifeq ($(DET_OS),Darwin)
 	@bash 00-setup/macos-setup.sh
-else ifeq ($(OS),Linux)
+else ifeq ($(DET_OS),Linux)
 	@bash 00-setup/linux-setup.sh
+else ifeq ($(DET_OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File 00-setup/windows-setup.ps1
 else
-	@echo "Unknown OS '$(OS)'. On Windows: pwsh -ExecutionPolicy Bypass -File 00-setup/windows-setup.ps1"
+	@echo "Unknown OS '$(DET_OS)'. On Windows: powershell -ExecutionPolicy Bypass -File 00-setup/windows-setup.ps1"
 	@exit 1
 endif
 
@@ -45,7 +51,11 @@ bench: ## Track 01 — TTFT/TPOT/P95 baseline + Q4_K_M vs Q2_K
 # ─────────────────────────────────────────────────────────────
 
 serve: ## Track 02 — start llama-server on :8080 (foreground)
-	@bash 02-llama-cpp-server/start-server.sh
+ifeq ($(DET_OS),Windows_NT)
+	@powershell -Command '$$env:PYTHON="$(PY)"; powershell -ExecutionPolicy Bypass -File 02-llama-cpp-server/start-server.ps1'
+else
+	@PYTHON=$(PY) bash 02-llama-cpp-server/start-server.sh
+endif
 
 smoke: ## Track 02 — smoke-test the running server
 	@$(PY) 02-llama-cpp-server/smoke-test.py

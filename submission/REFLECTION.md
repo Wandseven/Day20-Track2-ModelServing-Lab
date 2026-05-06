@@ -4,9 +4,11 @@
 
 ---
 
-**Họ Tên:** _<Họ Tên>_
-**Cohort:** _<A20-K1 / A20-K2 / ...>_
-**Ngày submit:** _<YYYY-MM-DD>_
+**Họ Tên:** Nguyễn Tuấn Kiệt
+
+**Cohort:** A20-K1
+
+**Ngày submit:** 2026-05-06
 
 ---
 
@@ -14,18 +16,16 @@
 
 > Paste output của `python 00-setup/detect-hardware.py` vào đây, hoặc điền thủ công:
 
-- **OS:** _<macOS 14 / Windows 11 / Ubuntu 24.04 / ...>_
-- **CPU:** _<Apple M2 / Intel i7-12700H / AMD Ryzen 7 5800H / ...>_
-- **Cores:** _<physical / logical>_
-- **CPU extensions:** _<AVX2 / AVX-512 / NEON / —>_
-- **RAM:** _<GB>_
-- **Accelerator:** _<NVIDIA RTX 4060 8GB / Apple Metal / AMD ROCm / Vulkan / CPU only>_
-- **llama.cpp backend đã chọn:** _<CUDA / Metal / Vulkan / CPU>_
-- **Recommended model tier:** _<TinyLlama-1.1B / Qwen2.5-1.5B / Llama-3.2-3B / Qwen2.5-7B>_
+- **OS:** Windows 11 (AMD64)
+- **CPU:** Intel/AMD 16 logical cores
+- **Cores:** 16 logical
+- **CPU extensions:** AVX2 / FMA / F16C
+- **RAM:** 16GB
+- **Accelerator:** NVIDIA GeForce RTX 3050 Laptop GPU (4GB VRAM)
+- **llama.cpp backend đã chọn:** CUDA (via llama-cpp-python)
+- **Recommended model tier:** TinyLlama-1.1B
 
-**Setup story** (≤ 80 chữ): những gì cần thay đổi để lab chạy được trên máy bạn (vd: dùng WSL2, install CUDA Toolkit, fall back sang Vulkan vì ROCm phiên bản kén, tắt antivirus để pip install nhanh hơn, v.v.):
-
-_Answer here._
+Sử dụng Windows 11 với GPU RTX 3050. Gặp thách thức khi thư viện `llama-cpp-python` không hỗ trợ sẵn flag `--metrics` như yêu cầu. Thay vì cài đặt bộ công cụ build C++ phức tạp trên Windows, tôi đã tự viết một script wrapper Python bổ sung endpoint Prometheus `/metrics` để thu thập dữ liệu token/s và KV-cache usage. Đồng thời cấu hình `git core.longpaths` để xử lý lỗi đường dẫn dài trên Windows.
 
 ---
 
@@ -33,14 +33,10 @@ _Answer here._
 
 > Paste bảng từ `benchmarks/01-quickstart-results.md` xuống đây (auto-generated bởi `python 01-llama-cpp-quickstart/benchmark.py`).
 
-| Model | Load (ms) | TTFT P50/P95 (ms) | TPOT P50/P95 (ms) | E2E P50/P95/P99 (ms) | Decode rate (tok/s) |
-|---|--:|--:|--:|--:|--:|
-| (Q4_K_M) | | | | | |
-| (Q2_K)   | | | | | |
+| tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf | 592 | 68 / 73 | 24.6 / 25.0 | 1581 / 1633 / 1638 | 40.7 |
+| tinyllama-1.1b-chat-v1.0.Q2_K.gguf | 142 | 113 / 155 | 19.8 / 20.4 | 1019 / 1365 / 1375 | 50.4 |
 
-**Một quan sát** (≤ 50 chữ): Q4_K_M vs Q2_K trên máy bạn — số liệu nói gì? Quality đáng đánh đổi không?
-
-_Answer here._
+Q4_K_M cho tốc độ rất tốt (40.7 tok/s) trên RTX 3050. Q2_K nhanh hơn khoảng 24% nhưng chất lượng text thấp hơn rõ rệt. Với 4GB VRAM, bản Q4 là lựa chọn tối ưu nhất cho sự cân bằng giữa tốc độ và chất lượng.
 
 ---
 
@@ -48,33 +44,27 @@ _Answer here._
 
 > Chạy 2 lần locust ở concurrency 10 và 50, paste tóm tắt bên dưới.
 
-| Concurrency | Total RPS | TTFB P50 (ms) | E2E P95 (ms) | E2E P99 (ms) | Failures |
-|--:|--:|--:|--:|--:|--:|
-| 10 | | | | | |
-| 50 | | | | | |
+| 10 | 0.41 | ~18000 | 29000 | 29000 | 0 |
+| 50 | 0.45 | ~23000 | 36000 | 40000 | 0 |
 
-**KV-cache observation** (từ `record-metrics.py`): peak `llamacpp:kv_cache_usage_ratio` ở concurrency 50 = _<0.XX>_, nghĩa là …
-
-_Answer here._
+**KV-cache observation** (từ `record-metrics.py`): peak `llamacpp:kv_cache_usage_ratio` ở concurrency 50 = _0.05_, nghĩa là Model TinyLlama 1.1B chiếm rất ít bộ nhớ cache trên GPU 4GB, cho phép phục vụ nhiều người dùng song song mà không lo tràn VRAM. Bottleneck chủ yếu nằm ở compute của GPU khi xử lý nhiều luồng cùng lúc.
 
 ---
 
 ## 4. Track 03 — Milestone integration
 
-- **N16 (Cloud/IaC):** _<piece you connected — k3d cluster / GCP project / docker-compose / "stub: localhost only">_
-- **N17 (Data pipeline):** _<piece — Airflow DAG / batch job / "stub: in-memory dict">_
-- **N18 (Lakehouse):** _<piece — Delta Lake table / Iceberg / "stub: SQLite">_
-- **N19 (Vector + Feature Store):** _<piece — Qdrant index / Feast / "stub: TOY_DOCS">_
+- **N16 (Cloud/IaC):** stub: localhost process (no Docker)
+- **N17 (Data pipeline):** stub: static python dictionary
+- **N18 (Lakehouse):** stub: JSON local source
+- **N19 (Vector + Feature Store):** stub: in-memory cosine similarity (TOY_DOCS)
 
 **Nơi tốn nhiều ms nhất** trong pipeline (đo bằng `time.perf_counter` trong `pipeline.py`):
 
-- embed: _<ms>_
-- retrieve: _<ms>_
-- llama-server: _<ms>_
+- embed: ~100 ms
+- retrieve: 0.0 ms
+- llama-server: 6004.8 ms
 
-**Reflection** (≤ 60 chữ): bottleneck nằm ở đâu? Có khớp với kỳ vọng không?
-
-_Answer here._
+**Reflection** (≤ 60 chữ): Bottleneck nằm hoàn toàn ở llama-server (chiếm 99.9% thời gian). Điều này đúng với kỳ vọng vì việc suy luận LLM (inference) đòi hỏi tài nguyên tính toán cực lớn so với việc tìm kiếm trong một tập dữ liệu nhỏ. Trong thực tế, khi tập dữ liệu lớn hơn, phần retrieve sẽ tăng lên nhưng LLM vẫn là phần nặng nhất.
 
 ---
 
@@ -82,27 +72,24 @@ _Answer here._
 
 > **Most important section.** Pick **một** thay đổi từ bonus track (build flag, thread sweep, quant pick, GPU offload, KV-cache quantization, speculative decoding, bất cứ challenge nào trong `BONUS-llama-cpp-optimization/CHALLENGES.md`) đã tạo ra speedup lớn nhất trên máy bạn.
 
-**Change:** _<vd: rebuild llama.cpp với `-DGGML_NATIVE=ON -DGGML_BLAS=ON`; vd: hạ `-t` từ 12 xuống 6; vd: bật Metal trên M2>_
+**Change:** Điều chỉnh số lượng CPU threads (`n_threads`) để tìm điểm cân bằng tối ưu giữa tính toán và băng thông bộ nhớ.
 
-**Before vs after** (paste 2-3 dòng từ sweep output):
+**Before vs after** (từ kết quả sweep):
 
 ```
-before: <số liệu>
-after:  <số liệu>
-speedup: ~<X.Y>×
+before (1 thread): 13.82 tok/s
+after  (12 threads): 38.44 tok/s
+speedup: ~2.78×
 ```
 
-**Tại sao nó work** (1–2 đoạn ngắn — đây là phần grader đọc kỹ nhất):
-
-_Giải thích như đang nói với một bạn cùng lớp đang ngồi cạnh. Tránh "vibes-based" reasoning — bám vào mô hình mental của hardware (memory bandwidth? compute? cache?). Nếu kết quả khác kỳ vọng từ deck, nói rõ — đó là phần grader thưởng điểm._
+**Tại sao nó work:**
+Việc tăng số thread giúp tận dụng song song hóa các phép toán ma trận trên CPU. Tuy nhiên, tốc độ đạt đỉnh ở 12 threads và giảm xuống ở 16 threads (tổng số cores của máy). Điều này chứng minh rằng `llama.cpp` bị giới hạn bởi băng thông bộ nhớ (memory-bandwidth bound). Khi dùng toàn bộ 16 logical cores, các lõi ảo bắt đầu tranh giành tài nguyên và gây ra độ trễ điều phối (overhead), dẫn đến việc thêm cores không còn mang lại hiệu quả mà ngược lại còn làm giảm hiệu năng tổng thể.
 
 ---
 
 ## 6. (Optional) Điều ngạc nhiên nhất
 
-_(1–2 câu — không bắt buộc, nhưng người grader đọc tất cả)_
-
-_Answer here._
+Điều ngạc nhiên nhất là việc cài đặt `/metrics` cho server Python không có sẵn, nhưng bằng cách viết một wrapper đơn giản, chúng ta vẫn có thể quan sát được các chỉ số vận hành của Model theo chuẩn Prometheus mà không cần build bản native phức tạp.
 
 ---
 
